@@ -8,10 +8,14 @@
     "storage",
     "downloads",
     "scripting",
-    "notifications"
+    "notifications",
+    "webRequest"
   ],
   "host_permissions": [
-    "https://animefire.plus/*"
+    "https://animefire.plus/*",
+    "https://*.animefire.plus/*",
+    "*://*.mp4",
+    "*://*/download/*"
   ],
   "action": {
     "default_popup": "popup.html",

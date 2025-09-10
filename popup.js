@@ -317,18 +317,8 @@ class AnimeFire {
     this.addProgressItem(`${animeName} - Episódio ${episodeNumber}`, 'downloading', progressId);
 
     try {
-      // Use stealth request through background script
       const downloadUrl = this.generateDownloadUrl(animeName, episodeNumber);
-      const response = await chrome.runtime.sendMessage({
-        action: 'stealth-fetch',
-        url: downloadUrl
-      });
-
-      if (!response.success) {
-        throw new Error(response.error);
-      }
-
-      const qualityLinks = this.extractQualityLinksFromHTML(response.html);
+      const qualityLinks = await this.getQualityLinks(downloadUrl);
       
       let selectedQuality = quality;
       if (quality === 'auto') {
@@ -336,27 +326,20 @@ class AnimeFire {
       }
 
       if (qualityLinks[selectedQuality]) {
-        const downloadResponse = await chrome.runtime.sendMessage({
-          action: 'download-episode',
-          animeName: animeName,
-          episodeNumber: episodeNumber,
-          quality: selectedQuality,
-          url: qualityLinks[selectedQuality]
+        await chrome.downloads.download({
+          url: qualityLinks[selectedQuality],
+          filename: `anime_fire/${animeName.replace(/[^a-zA-Z0-9]/g, '_')}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`,
+          conflictAction: 'uniquify'
         });
 
-        if (downloadResponse.success) {
-          this.updateProgressItem(progressId, 'completed');
-          this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber}`, 'success');
-        } else {
-          throw new Error(downloadResponse.error);
-        }
+        this.updateProgressItem(progressId, 'completed');
+        this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber}`, 'success');
       } else {
         throw new Error(`Qualidade ${selectedQuality} não disponível`);
       }
     } catch (error) {
       this.updateProgressItem(progressId, 'error');
       this.showNotification(`Erro no download: ${error.message}`, 'error');
-      console.error('Download error:', error);
     }
   }
 
@@ -365,28 +348,62 @@ class AnimeFire {
     return `https://animefire.plus/download/${urlName}/${episodeNumber}`;
   }
 
-  async getQualityLinks(downloadUrl) {
-    try {
-      const response = await fetch(downloadUrl);
-      const html = await response.text();
-      
-      // Parse HTML to extract quality links
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const links = {};
-      
-      const qualityLinks = doc.querySelectorAll('a[href]');
-      qualityLinks.forEach(link => {
-        const text = link.textContent.trim();
-        if (['SD', 'HD', 'F-HD', 'FullHD'].includes(text)) {
-          links[text] = link.getAttribute('href');
-        }
-      });
-      
-      return links;
-    } catch (error) {
-      throw new Error(`Erro ao obter links de qualidade: ${error.message}`);
+  extractQualityLinksFromHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const links = {};
+    
+    // Try multiple approaches to find quality links
+    const approaches = [
+      () => {
+        const qualityLinks = doc.querySelectorAll('a[href]');
+        qualityLinks.forEach(link => {
+          const text = link.textContent.trim();
+          if (['SD', 'HD', 'F-HD', 'FullHD'].includes(text)) {
+            links[text] = link.getAttribute('href');
+          }
+        });
+      },
+      () => {
+        const videoLinks = doc.querySelectorAll('a[href*=".mp4"], a[href*="download"], a[href*="stream"]');
+        videoLinks.forEach((link, index) => {
+          const href = link.getAttribute('href');
+          const text = link.textContent.trim();
+          
+          if (href && (href.includes('.mp4') || href.includes('download'))) {
+            const quality = ['SD', 'HD', 'F-HD', 'FullHD'].includes(text) ? text : `Quality${index}`;
+            links[quality] = href;
+          }
+        });
+      },
+      () => {
+        // Parse from script tags
+        const scripts = doc.querySelectorAll('script');
+        scripts.forEach(script => {
+          const content = script.textContent;
+          const matches = content.match(/(?:src|url|link)["']\s*:\s*["']([^"']*\.mp4[^"']*)["']/gi);
+          if (matches) {
+            matches.forEach((match, index) => {
+              const urlMatch = match.match(/["']([^"']*\.mp4[^"']*)["']/);
+              if (urlMatch) {
+                links[`Quality${index}`] = urlMatch[1];
+              }
+            });
+          }
+        });
+      }
+    ];
+
+    for (const approach of approaches) {
+      try {
+        approach();
+        if (Object.keys(links).length > 0) break;
+      } catch (error) {
+        console.error('Error in quality extraction approach:', error);
+      }
     }
+    
+    return links;
   }
 
   getBestQuality(qualityLinks) {
