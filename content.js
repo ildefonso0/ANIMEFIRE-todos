@@ -1,20 +1,23 @@
 class AnimeFireContentScript {
   constructor() {
+    this.requestCount = 0;
+    this.lastRequestTime = 0;
     this.init();
   }
 
   init() {
-    this.addDownloadButtons();
-    this.setupPageObserver();
+    // Wait a bit before adding buttons to avoid detection
+    setTimeout(() => {
+      this.addDownloadButtons();
+      this.setupPageObserver();
+    }, Math.random() * 3000 + 1000); // Random delay between 1-4 seconds
   }
 
   addDownloadButtons() {
-    // Add download button to episode pages
     if (this.isEpisodePage()) {
       this.addEpisodeDownloadButton();
     }
     
-    // Add download buttons to anime main pages
     if (this.isAnimePage()) {
       this.addAnimeDownloadButtons();
     }
@@ -31,42 +34,69 @@ class AnimeFireContentScript {
   }
 
   addEpisodeDownloadButton() {
-    // Find a good place to add the download button
-    const videoContainer = document.querySelector('.video-container, .player-container, #video-player');
-    const titleContainer = document.querySelector('h1, .episode-title, .anime-title');
+    const videoContainer = document.querySelector('.video-container, .player-container, #video-player, .video-player');
+    const titleContainer = document.querySelector('h1, .episode-title, .anime-title, .title');
+    const contentContainer = document.querySelector('.content, .main-content, .episode-content');
     
-    if (videoContainer || titleContainer) {
+    const targetContainer = videoContainer || titleContainer || contentContainer;
+    
+    if (targetContainer && !document.querySelector('.af-download-main')) {
       const downloadBtn = this.createDownloadButton('Baixar Episódio', () => {
         this.downloadCurrentEpisode();
       });
       
-      const container = videoContainer || titleContainer;
-      container.parentNode.insertBefore(downloadBtn, container.nextSibling);
+      // Try to insert in a good position
+      if (targetContainer.parentNode) {
+        targetContainer.parentNode.insertBefore(downloadBtn, targetContainer.nextSibling);
+      } else {
+        document.body.appendChild(downloadBtn);
+      }
     }
   }
 
   addAnimeDownloadButtons() {
-    // Add download all button
-    const animeInfo = document.querySelector('.anime-info, .anime-details, h1');
-    if (animeInfo) {
+    const animeInfo = document.querySelector('.anime-info, .anime-details, .info, h1, .title');
+    if (animeInfo && !document.querySelector('.af-download-all')) {
       const downloadAllBtn = this.createDownloadButton('Baixar Todos os Episódios', () => {
         this.downloadAllEpisodes();
       });
-      animeInfo.parentNode.insertBefore(downloadAllBtn, animeInfo.nextSibling);
+      downloadAllBtn.classList.add('af-download-all');
+      
+      if (animeInfo.parentNode) {
+        animeInfo.parentNode.insertBefore(downloadAllBtn, animeInfo.nextSibling);
+      }
     }
 
-    // Add individual download buttons to episode list
-    const episodeLinks = document.querySelectorAll('.lEp.epT.divNumEp, .episode-link');
+    // Add individual download buttons with better selectors
+    const episodeSelectors = [
+      '.lEp.epT.divNumEp',
+      '.episode-link',
+      '.episode-item',
+      '.ep-item',
+      'a[href*="/animes/"][href*="/"]'
+    ];
+
+    let episodeLinks = [];
+    for (const selector of episodeSelectors) {
+      episodeLinks = document.querySelectorAll(selector);
+      if (episodeLinks.length > 0) break;
+    }
+
     episodeLinks.forEach(link => {
-      if (!link.querySelector('.af-download-btn')) {
-        const downloadBtn = this.createSmallDownloadButton(() => {
-          const href = link.getAttribute('href');
-          const match = href.match(/animes\/([^\/]+)\/(\d+)/);
-          if (match) {
-            this.downloadEpisode(match[1], match[2]);
-          }
-        });
-        link.appendChild(downloadBtn);
+      if (!link.querySelector('.af-download-btn') && link.getAttribute('href')) {
+        const href = link.getAttribute('href');
+        if (href.match(/animes\/[^\/]+\/\d+/)) {
+          const downloadBtn = this.createSmallDownloadButton(() => {
+            const match = href.match(/animes\/([^\/]+)\/(\d+)/);
+            if (match) {
+              this.downloadEpisode(match[1], match[2]);
+            }
+          });
+          
+          // Position the button better
+          link.style.position = 'relative';
+          link.appendChild(downloadBtn);
+        }
       }
     });
   }
@@ -80,7 +110,11 @@ class AnimeFireContentScript {
       </svg>
       ${text}
     `;
-    button.addEventListener('click', onClick);
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    });
     return button;
   }
 
@@ -109,7 +143,7 @@ class AnimeFireContentScript {
   }
 
   async downloadAllEpisodes() {
-    const episodeLinks = document.querySelectorAll('.lEp.epT.divNumEp, .episode-link');
+    const episodeLinks = this.getAllEpisodeLinks();
     const episodes = [];
     
     episodeLinks.forEach(link => {
@@ -120,47 +154,85 @@ class AnimeFireContentScript {
       }
     });
 
+    if (episodes.length === 0) {
+      this.showNotification('Nenhum episódio encontrado', 'error');
+      return;
+    }
+
+    this.showNotification(`Iniciando download de ${episodes.length} episódios...`, 'info');
+
     for (let i = 0; i < episodes.length; i++) {
       const { anime, episode } = episodes[i];
       await this.downloadEpisode(anime, episode);
       
       if (i < episodes.length - 1) {
-        await this.delay(20000); // 20 second delay
+        const delay = this.calculateDynamicDelay();
+        await this.delay(delay);
       }
     }
   }
 
+  getAllEpisodeLinks() {
+    const selectors = [
+      '.lEp.epT.divNumEp',
+      '.episode-link',
+      '.episode-item',
+      '.ep-item',
+      'a[href*="/animes/"]'
+    ];
+
+    for (const selector of selectors) {
+      const links = document.querySelectorAll(selector);
+      if (links.length > 0) {
+        return Array.from(links).filter(link => {
+          const href = link.getAttribute('href');
+          return href && href.match(/animes\/[^\/]+\/\d+/);
+        });
+      }
+    }
+    
+    return [];
+  }
+
   async downloadEpisode(animeName, episodeNumber) {
     try {
-      const downloadUrl = `https://animefire.plus/download/${animeName}/${episodeNumber}`;
-      
-      // Show loading state
       this.showNotification(`Iniciando download: ${animeName} - Episódio ${episodeNumber}`, 'info');
       
-      // Get quality links
-      const response = await fetch(downloadUrl);
-      const html = await response.text();
-      const qualityLinks = this.extractQualityLinks(html);
+      const downloadUrl = `https://animefire.plus/download/${animeName}/${episodeNumber}`;
       
-      // Get best quality
+      // Use stealth request through background script
+      const response = await this.sendMessage({
+        action: 'stealth-fetch',
+        url: downloadUrl
+      });
+
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      const qualityLinks = this.extractQualityLinks(response.html);
       const bestQuality = this.getBestQuality(qualityLinks);
       
       if (qualityLinks[bestQuality]) {
-        // Send message to background script to handle download
-        chrome.runtime.sendMessage({
+        const downloadResponse = await this.sendMessage({
           action: 'download-episode',
           animeName: animeName,
           episodeNumber: episodeNumber,
           quality: bestQuality,
           url: qualityLinks[bestQuality]
         });
-        
-        this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber} (${bestQuality})`, 'success');
+
+        if (downloadResponse.success) {
+          this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber} (${bestQuality})`, 'success');
+        } else {
+          throw new Error(downloadResponse.error);
+        }
       } else {
         throw new Error('Nenhuma qualidade disponível');
       }
     } catch (error) {
       this.showNotification(`Erro no download: ${error.message}`, 'error');
+      console.error('Download error:', error);
     }
   }
 
@@ -169,13 +241,55 @@ class AnimeFireContentScript {
     const doc = parser.parseFromString(html, 'text/html');
     const links = {};
     
-    const qualityLinks = doc.querySelectorAll('a[href]');
-    qualityLinks.forEach(link => {
-      const text = link.textContent.trim();
-      if (['SD', 'HD', 'F-HD', 'FullHD'].includes(text)) {
-        links[text] = link.getAttribute('href');
+    // Try multiple approaches to find quality links
+    const approaches = [
+      () => {
+        const qualityLinks = doc.querySelectorAll('a[href]');
+        qualityLinks.forEach(link => {
+          const text = link.textContent.trim();
+          if (['SD', 'HD', 'F-HD', 'FullHD'].includes(text)) {
+            links[text] = link.getAttribute('href');
+          }
+        });
+      },
+      () => {
+        const videoLinks = doc.querySelectorAll('a[href*=".mp4"], a[href*="download"], a[href*="stream"]');
+        videoLinks.forEach((link, index) => {
+          const href = link.getAttribute('href');
+          const text = link.textContent.trim();
+          
+          if (href && (href.includes('.mp4') || href.includes('download'))) {
+            const quality = ['SD', 'HD', 'F-HD', 'FullHD'].includes(text) ? text : `Quality${index}`;
+            links[quality] = href;
+          }
+        });
+      },
+      () => {
+        // Parse from script tags or data attributes
+        const scripts = doc.querySelectorAll('script');
+        scripts.forEach(script => {
+          const content = script.textContent;
+          const matches = content.match(/(?:src|url|link)["']\s*:\s*["']([^"']*\.mp4[^"']*)["']/gi);
+          if (matches) {
+            matches.forEach((match, index) => {
+              const urlMatch = match.match(/["']([^"']*\.mp4[^"']*)["']/);
+              if (urlMatch) {
+                links[`Quality${index}`] = urlMatch[1];
+              }
+            });
+          }
+        });
       }
-    });
+    ];
+
+    for (const approach of approaches) {
+      try {
+        approach();
+        if (Object.keys(links).length > 0) break;
+      } catch (error) {
+        console.error('Error in quality extraction approach:', error);
+      }
+    }
     
     return links;
   }
@@ -190,8 +304,21 @@ class AnimeFireContentScript {
     return Object.keys(qualityLinks)[0];
   }
 
+  calculateDynamicDelay() {
+    this.requestCount++;
+    const baseDelay = 3000; // 3 seconds base
+    const additionalDelay = Math.min(this.requestCount * 1000, 15000); // Up to 15 seconds additional
+    const randomFactor = Math.random() * 5000; // Random 0-5 seconds
+    return baseDelay + additionalDelay + randomFactor;
+  }
+
+  sendMessage(message) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, resolve);
+    });
+  }
+
   showNotification(message, type = 'info') {
-    // Remove existing notifications
     const existing = document.querySelectorAll('.af-notification');
     existing.forEach(n => n.remove());
 
@@ -201,18 +328,21 @@ class AnimeFireContentScript {
     
     document.body.appendChild(notification);
     
-    // Auto remove after 3 seconds
     setTimeout(() => {
       if (notification.parentNode) {
         notification.parentNode.removeChild(notification);
       }
-    }, 3000);
+    }, 4000);
   }
 
   setupPageObserver() {
-    // Watch for page changes (SPA navigation)
+    let timeoutId;
+    
     const observer = new MutationObserver(() => {
-      this.addDownloadButtons();
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        this.addDownloadButtons();
+      }, 1000); // Debounce to avoid too many calls
     });
     
     observer.observe(document.body, {
@@ -226,11 +356,15 @@ class AnimeFireContentScript {
   }
 }
 
-// Initialize content script
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+// Initialize with random delay to avoid detection patterns
+const initDelay = Math.random() * 2000 + 500; // 0.5-2.5 seconds
+
+setTimeout(() => {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      new AnimeFireContentScript();
+    });
+  } else {
     new AnimeFireContentScript();
-  });
-} else {
-  new AnimeFireContentScript();
-}
+  }
+}, initDelay);
