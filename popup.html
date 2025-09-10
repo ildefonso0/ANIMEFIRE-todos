@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AnimeFire Downloader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <img src="icons/icon48.png" alt="AnimeFire Downloader" class="logo-img">
+        <h1>AnimeFire Downloader</h1>
+      </div>
+      <div class="version">v1.0.0</div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="current">Página Atual</button>
+      <button class="tab-btn" data-tab="batch">Download em Lote</button>
+      <button class="tab-btn" data-tab="settings">Configurações</button>
+    </div>
+
+    <div class="tab-content active" id="current-tab">
+      <div class="page-info">
+        <div class="page-status">
+          <span class="status-indicator" id="page-status"></span>
+          <span id="page-type">Detectando página...</span>
+        </div>
+      </div>
+
+      <div class="episode-info" id="episode-info" style="display: none;">
+        <h3>Episódio Detectado</h3>
+        <div class="info-item">
+          <span class="label">Anime:</span>
+          <span id="anime-name">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Episódio:</span>
+          <span id="episode-number">-</span>
+        </div>
+        <div class="quality-selector">
+          <label for="quality-select">Qualidade:</label>
+          <select id="quality-select">
+            <option value="auto">Melhor Disponível</option>
+            <option value="FullHD">FullHD</option>
+            <option value="F-HD">F-HD</option>
+            <option value="HD">HD</option>
+            <option value="SD">SD</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="download-current">
+          <span class="btn-icon">⬇</span>
+          Baixar Episódio
+        </button>
+      </div>
+
+      <div class="anime-info" id="anime-info" style="display: none;">
+        <h3>Anime Detectado</h3>
+        <div class="info-item">
+          <span class="label">Nome:</span>
+          <span id="anime-title">-</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Episódios:</span>
+          <span id="episode-count">-</span>
+        </div>
+        <div class="episode-range">
+          <label>Episódios para baixar:</label>
+          <div class="range-inputs">
+            <input type="number" id="start-episode" placeholder="Início" min="1">
+            <span>até</span>
+            <input type="number" id="end-episode" placeholder="Fim" min="1">
+          </div>
+          <button class="btn btn-secondary" id="select-all">Todos</button>
+        </div>
+        <div class="quality-selector">
+          <label for="anime-quality-select">Qualidade:</label>
+          <select id="anime-quality-select">
+            <option value="auto">Melhor Disponível</option>
+            <option value="FullHD">FullHD</option>
+            <option value="F-HD">F-HD</option>
+            <option value="HD">HD</option>
+            <option value="SD">SD</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="download-anime">
+          <span class="btn-icon">⬇</span>
+          Baixar Episódios
+        </button>
+      </div>
+
+      <div class="no-anime" id="no-anime">
+        <div class="empty-state">
+          <div class="empty-icon">📺</div>
+          <h3>Nenhum anime detectado</h3>
+          <p>Navegue até uma página de anime ou episódio no AnimeFire.plus</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="batch-tab">
+      <div class="batch-section">
+        <h3>Download em Lote</h3>
+        <p>Cole os links dos episódios (um por linha):</p>
+        <textarea id="batch-links" placeholder="https://animefire.plus/animes/anime-name/1&#10;https://animefire.plus/animes/anime-name/2&#10;..."></textarea>
+        <div class="quality-selector">
+          <label for="batch-quality-select">Qualidade:</label>
+          <select id="batch-quality-select">
+            <option value="auto">Melhor Disponível</option>
+            <option value="FullHD">FullHD</option>
+            <option value="F-HD">F-HD</option>
+            <option value="HD">HD</option>
+            <option value="SD">SD</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="download-batch">
+          <span class="btn-icon">⬇</span>
+          Baixar Todos
+        </button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="settings-tab">
+      <div class="settings-section">
+        <h3>Configurações</h3>
+        
+        <div class="setting-item">
+          <label for="download-delay">Intervalo entre downloads (segundos):</label>
+          <input type="number" id="download-delay" min="1" max="60" value="20">
+        </div>
+
+        <div class="setting-item">
+          <label for="download-all-qualities">
+            <input type="checkbox" id="download-all-qualities">
+            Baixar todas as qualidades disponíveis
+          </label>
+        </div>
+
+        <div class="setting-item">
+          <label for="auto-detect">
+            <input type="checkbox" id="auto-detect" checked>
+            Detectar automaticamente episódios na página
+          </label>
+        </div>
+
+        <div class="setting-item">
+          <label for="show-notifications">
+            <input type="checkbox" id="show-notifications" checked>
+            Mostrar notificações de download
+          </label>
+        </div>
+
+        <button class="btn btn-secondary" id="reset-settings">Restaurar Padrões</button>
+      </div>
+
+      <div class="about-section">
+        <h3>Sobre</h3>
+        <p>AnimeFire Downloader v1.0.0</p>
+        <p>Desenvolvido por <a href="https://github.com/e43b" target="_blank">E43b</a></p>
+        <div class="links">
+          <a href="https://github.com/e43b/AnimeFire-Downloader" target="_blank">GitHub</a>
+          <a href="https://discord.gg/GgBbbjDkXu" target="_blank">Discord</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="download-progress" id="download-progress" style="display: none;">
+      <div class="progress-header">
+        <h3>Downloads em Progresso</h3>
+        <button class="btn-close" id="close-progress">×</button>
+      </div>
+      <div class="progress-list" id="progress-list"></div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

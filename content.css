@@ -1,0 +1,106 @@
+.af-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin: 8px 4px;
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.af-download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
+.af-download-btn:active {
+  transform: translateY(0);
+}
+
+.af-download-small {
+  padding: 4px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  margin: 2px;
+  min-width: auto;
+}
+
+.af-download-small svg {
+  width: 12px;
+  height: 12px;
+}
+
+.af-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+  z-index: 10000;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.af-notification-success {
+  background: #28a745;
+}
+
+.af-notification-error {
+  background: #dc3545;
+}
+
+.af-notification-info {
+  background: #17a2b8;
+}
+
+/* Integration with AnimeFire styles */
+.lEp.epT.divNumEp {
+  position: relative;
+}
+
+.lEp.epT.divNumEp .af-download-small {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.lEp.epT.divNumEp:hover .af-download-small {
+  opacity: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .af-download-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .af-notification {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
