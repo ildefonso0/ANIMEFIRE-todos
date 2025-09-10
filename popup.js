@@ -317,8 +317,18 @@ class AnimeFire {
     this.addProgressItem(`${animeName} - Episódio ${episodeNumber}`, 'downloading', progressId);
 
     try {
+      // Use stealth request through background script
       const downloadUrl = this.generateDownloadUrl(animeName, episodeNumber);
-      const qualityLinks = await this.getQualityLinks(downloadUrl);
+      const response = await chrome.runtime.sendMessage({
+        action: 'stealth-fetch',
+        url: downloadUrl
+      });
+
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      const qualityLinks = this.extractQualityLinksFromHTML(response.html);
       
       let selectedQuality = quality;
       if (quality === 'auto') {
@@ -326,20 +336,27 @@ class AnimeFire {
       }
 
       if (qualityLinks[selectedQuality]) {
-        await chrome.downloads.download({
-          url: qualityLinks[selectedQuality],
-          filename: `anime_fire/${animeName.replace(/[^a-zA-Z0-9]/g, '_')}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`,
-          conflictAction: 'uniquify'
+        const downloadResponse = await chrome.runtime.sendMessage({
+          action: 'download-episode',
+          animeName: animeName,
+          episodeNumber: episodeNumber,
+          quality: selectedQuality,
+          url: qualityLinks[selectedQuality]
         });
 
-        this.updateProgressItem(progressId, 'completed');
-        this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber}`, 'success');
+        if (downloadResponse.success) {
+          this.updateProgressItem(progressId, 'completed');
+          this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber}`, 'success');
+        } else {
+          throw new Error(downloadResponse.error);
+        }
       } else {
         throw new Error(`Qualidade ${selectedQuality} não disponível`);
       }
     } catch (error) {
       this.updateProgressItem(progressId, 'error');
       this.showNotification(`Erro no download: ${error.message}`, 'error');
+      console.error('Download error:', error);
     }
   }
 
