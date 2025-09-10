@@ -317,7 +317,6 @@ class AnimeFire {
     this.addProgressItem(`${animeName} - Episódio ${episodeNumber}`, 'downloading', progressId);
 
     try {
-      // Simulate download process (in real extension, this would make actual requests)
       const downloadUrl = this.generateDownloadUrl(animeName, episodeNumber);
       const qualityLinks = await this.getQualityLinks(downloadUrl);
       
@@ -327,10 +326,10 @@ class AnimeFire {
       }
 
       if (qualityLinks[selectedQuality]) {
-        // Use Chrome downloads API
         await chrome.downloads.download({
           url: qualityLinks[selectedQuality],
-          filename: `anime_fire/${animeName}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`
+          filename: `anime_fire/${animeName.replace(/[^a-zA-Z0-9]/g, '_')}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`,
+          conflictAction: 'uniquify'
         });
 
         this.updateProgressItem(progressId, 'completed');
@@ -350,14 +349,27 @@ class AnimeFire {
   }
 
   async getQualityLinks(downloadUrl) {
-    // This would normally make a request to the download page and parse quality links
-    // For demo purposes, returning mock data
-    return {
-      'FullHD': `${downloadUrl}/fullhd.mp4`,
-      'F-HD': `${downloadUrl}/fhd.mp4`,
-      'HD': `${downloadUrl}/hd.mp4`,
-      'SD': `${downloadUrl}/sd.mp4`
-    };
+    try {
+      const response = await fetch(downloadUrl);
+      const html = await response.text();
+      
+      // Parse HTML to extract quality links
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const links = {};
+      
+      const qualityLinks = doc.querySelectorAll('a[href]');
+      qualityLinks.forEach(link => {
+        const text = link.textContent.trim();
+        if (['SD', 'HD', 'F-HD', 'FullHD'].includes(text)) {
+          links[text] = link.getAttribute('href');
+        }
+      });
+      
+      return links;
+    } catch (error) {
+      throw new Error(`Erro ao obter links de qualidade: ${error.message}`);
+    }
   }
 
   getBestQuality(qualityLinks) {

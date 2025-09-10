@@ -50,7 +50,7 @@ class AnimeFireBackground {
   setupMessageListener() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'download-episode') {
-        this.downloadEpisode(request.animeName, request.episodeNumber, request.quality)
+        this.downloadEpisodeFromMessage(request)
           .then(result => sendResponse({ success: true, result }))
           .catch(error => sendResponse({ success: false, error: error.message }));
         return true; // Keep message channel open for async response
@@ -154,7 +154,7 @@ class AnimeFireBackground {
 
       const downloadId = await chrome.downloads.download({
         url: qualityLinks[selectedQuality],
-        filename: `anime_fire/${animeName}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`,
+        filename: `anime_fire/${animeName.replace(/[^a-zA-Z0-9]/g, '_')}/${episodeNumber}_${selectedQuality.toLowerCase()}.mp4`,
         conflictAction: 'uniquify'
       });
 
@@ -164,6 +164,19 @@ class AnimeFireBackground {
     }
   }
 
+  async downloadEpisodeFromMessage(request) {
+    try {
+      const downloadId = await chrome.downloads.download({
+        url: request.url,
+        filename: `anime_fire/${request.animeName.replace(/[^a-zA-Z0-9]/g, '_')}/${request.episodeNumber}_${request.quality.toLowerCase()}.mp4`,
+        conflictAction: 'uniquify'
+      });
+
+      return { downloadId, quality: request.quality };
+    } catch (error) {
+      throw new Error(`Falha no download: ${error.message}`);
+    }
+  }
   async getQualityLinks(downloadUrl) {
     try {
       const response = await fetch(downloadUrl);
@@ -199,15 +212,8 @@ class AnimeFireBackground {
   }
 
   showNotification(message, type = 'info') {
-    const iconMap = {
-      success: 'icons/icon48.png',
-      error: 'icons/icon48.png',
-      info: 'icons/icon48.png'
-    };
-
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: iconMap[type],
       title: 'AnimeFire Downloader',
       message: message
     });

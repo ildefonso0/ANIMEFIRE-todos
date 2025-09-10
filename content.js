@@ -146,13 +146,14 @@ class AnimeFireContentScript {
       const bestQuality = this.getBestQuality(qualityLinks);
       
       if (qualityLinks[bestQuality]) {
-        // Trigger download
-        const link = document.createElement('a');
-        link.href = qualityLinks[bestQuality];
-        link.download = `${animeName}_${episodeNumber}_${bestQuality.toLowerCase()}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Send message to background script to handle download
+        chrome.runtime.sendMessage({
+          action: 'download-episode',
+          animeName: animeName,
+          episodeNumber: episodeNumber,
+          quality: bestQuality,
+          url: qualityLinks[bestQuality]
+        });
         
         this.showNotification(`Download iniciado: ${animeName} - Ep ${episodeNumber} (${bestQuality})`, 'success');
       } else {

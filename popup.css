@@ -32,13 +32,7 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.logo-img {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  gap: 8px;
 }
 
 .logo h1 {
